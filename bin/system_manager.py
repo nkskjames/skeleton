@@ -56,11 +56,6 @@ class SystemManager(Openbmc.DbusProperties,Openbmc.DbusObjectManager):
 				System.ID_LOOKUP[category][key] = new_val
 	
 		self.SystemStateHandler(System.SYSTEM_STATES[0])
-
-		if not os.path.exists(PropertyCacher.CACHE_PATH):
-			print "Creating cache directory: "+PropertyCacher.CACHE_PATH
-   			os.makedirs(PropertyCacher.CACHE_PATH)
-
 		self.InterfacesAdded(obj_name,self.properties)
 		print "SystemManager Init Done"
 

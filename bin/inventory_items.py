@@ -37,7 +37,7 @@ class InventoryItem(Openbmc.DbusProperties):
 		self.name = name
 		
 		## this will load properties from cache
-		# PropertyCacher.load(name,INTF_NAME,self.properties)
+		PropertyCacher.load(name,INTF_NAME,self.properties)
 		if (data.has_key('present') == False):
 			data['present'] = 'False'
 		if (data.has_key('fault') == False):

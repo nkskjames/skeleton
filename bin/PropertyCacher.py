@@ -3,7 +3,7 @@ import cPickle
 import json
 import Openbmc
 
-CACHE_PATH = '/var/cache/obmc/'
+CACHE_PATH = '/var/lib/obmc/inventory/'
 
 def getCacheFilename(obj_path, iface_name):
 	name = obj_path.replace('/','.')
