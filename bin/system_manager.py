@@ -57,8 +57,10 @@ class SystemManager(Openbmc.DbusProperties,Openbmc.DbusObjectManager):
 	
 		self.SystemStateHandler(System.SYSTEM_STATES[0])
 		self.InterfacesAdded(obj_name,self.properties)
-		print "SystemManager Init Done"
 
+		## Add poll for heartbeat
+	    	gobject.timeout_add(HEARTBEAT_CHECK_INTERVAL, self.heartbeat_check)
+		print "SystemManager Init Done"
 
 	def SystemStateHandler(self,state_name):
 		## clearing object started flags
@@ -73,10 +75,6 @@ class SystemManager(Openbmc.DbusProperties,Openbmc.DbusObjectManager):
 		if (self.system_states.has_key(state_name)):
 			for name in self.system_states[state_name]:
 				self.start_process(name)
-		
-		if (state_name == "BMC_INIT"):
-			## Add poll for heartbeat
-	    		gobject.timeout_add(HEARTBEAT_CHECK_INTERVAL, self.heartbeat_check)
 		
 		try:	
 			cb = System.ENTER_STATE_CALLBACK[state_name]
