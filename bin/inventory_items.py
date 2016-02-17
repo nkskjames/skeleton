@@ -28,31 +28,38 @@ class Inventory(Openbmc.DbusProperties,Openbmc.DbusObjectManager):
 		dbus.service.Object.__init__(self,bus,name)
 		self.InterfacesAdded(name,self.properties)
 
+	@dbus.service.method(DBUS_NAME,
+		in_signature='', out_signature='')
+	def clearFaults(self):
+		for obj in self.objects.values():
+			obj.Set(INTF_NAME,"fault","False")
 
-class InventoryItem(Openbmc.DbusProperties):
-	def __init__(self,bus,name,data):		
-		Openbmc.DbusProperties.__init__(self)
+
+
+
+class InventoryItem(Openbmc.DbusPropertiesCached):
+	def __init__(self,bus,name,data):	
+		Openbmc.DbusPropertiesCached.__init__(self,name,{ INTF_NAME: True } )
 		dbus.service.Object.__init__(self,bus,name)
 
 		self.name = name
 		
-		## this will load properties from cache
-		# PropertyCacher.load(name,INTF_NAME,self.properties)
-		if (data.has_key('present') == False):
-			data['present'] = 'False'
-		if (data.has_key('fault') == False):
+		if (data.has_key('present') == False and
+		    self.properties[INTF_NAME].has_key('present') == False):
+			data['present'] = 'False' 
+		if (data.has_key('fault') == False and
+		    self.properties[INTF_NAME].has_key('fault') == False):
 			data['fault'] = 'False'
-		if (data.has_key('version') == False):
+		if (data.has_key('version') == False and
+		    self.properties[INTF_NAME].has_key('version') == False):
 			data['version'] = ''
 
 		self.SetMultiple(INTF_NAME,data)
-		
 		
 	@dbus.service.method(INTF_NAME,
 		in_signature='a{sv}', out_signature='')
 	def update(self,data):
 		self.SetMultiple(INTF_NAME,data)
-		PropertyCacher.save(self.name,INTF_NAME,self.properties)
 
 	@dbus.service.method(INTF_NAME,
 		in_signature='s', out_signature='')
@@ -89,7 +96,7 @@ if __name__ == '__main__':
 	obj_parent.add(obj_path,obj)
 
     	## TODO:  this is a hack to update bmc inventory item with version
-    	## should be done by flash object
+    	## should be done by bmc control
 	if (FRUS[f]['fru_type'] == "BMC"):
 		version = getVersion()
 		obj.update({'version': version})

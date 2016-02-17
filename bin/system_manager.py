@@ -56,14 +56,11 @@ class SystemManager(Openbmc.DbusProperties,Openbmc.DbusObjectManager):
 				System.ID_LOOKUP[category][key] = new_val
 	
 		self.SystemStateHandler(System.SYSTEM_STATES[0])
-
-		if not os.path.exists(PropertyCacher.CACHE_PATH):
-			print "Creating cache directory: "+PropertyCacher.CACHE_PATH
-   			os.makedirs(PropertyCacher.CACHE_PATH)
-
 		self.InterfacesAdded(obj_name,self.properties)
-		print "SystemManager Init Done"
 
+		## Add poll for heartbeat
+	    	gobject.timeout_add(HEARTBEAT_CHECK_INTERVAL, self.heartbeat_check)
+		print "SystemManager Init Done"
 
 	def SystemStateHandler(self,state_name):
 		## clearing object started flags
@@ -78,10 +75,6 @@ class SystemManager(Openbmc.DbusProperties,Openbmc.DbusObjectManager):
 		if (self.system_states.has_key(state_name)):
 			for name in self.system_states[state_name]:
 				self.start_process(name)
-		
-		if (state_name == "BMC_INIT"):
-			## Add poll for heartbeat
-	    		gobject.timeout_add(HEARTBEAT_CHECK_INTERVAL, self.heartbeat_check)
 		
 		try:	
 			cb = System.ENTER_STATE_CALLBACK[state_name]

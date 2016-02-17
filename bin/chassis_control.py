@@ -13,12 +13,28 @@ DBUS_NAME = 'org.openbmc.control.Chassis'
 OBJ_NAME = '/org/openbmc/control/chassis0'
 CONTROL_INTF = 'org.openbmc.Control'
 
+MACHINE_ID = '/etc/machine-id'
+
 POWER_OFF = 0
 POWER_ON = 1
 
 BOOTED = 100
 
 class ChassisControlObject(Openbmc.DbusProperties,Openbmc.DbusObjectManager):
+	def getUuid(self):
+		uuid = "";
+		try:
+			with open(MACHINE_ID) as f:
+				data = f.readline().rstrip('\n')
+				if (len(data) == 32):
+					uuid = data
+				else:
+					print "ERROR:  UUID is not formatted correctly: "+data
+		except:
+			print "ERROR: Unable to open uuid file: "+MACHINE_ID
+				
+		return uuid
+ 
 	def __init__(self,bus,name):
 		self.dbus_objects = { }
 		Openbmc.DbusProperties.__init__(self)
@@ -33,7 +49,7 @@ class ChassisControlObject(Openbmc.DbusProperties,Openbmc.DbusObjectManager):
 			},
 			'identify_led' : {
 				'bus_name' : 'org.openbmc.control.led',
-				'object_name' : '/org/openbmc/led/IDENTIFY',
+				'object_name' : '/org/openbmc/control/led/identify',
 				'interface_name' : 'org.openbmc.Led'
 			},
 			'watchdog' : {				
@@ -54,7 +70,7 @@ class ChassisControlObject(Openbmc.DbusProperties,Openbmc.DbusObjectManager):
 		}
 
 		#uuid
-		self.Set(DBUS_NAME,"uuid",str(uuid.uuid1()))
+		self.Set(DBUS_NAME,"uuid",self.getUuid())
 		self.Set(DBUS_NAME,"reboot",0)
 
 		bus.add_signal_receiver(self.power_button_signal_handler, 
@@ -118,6 +134,8 @@ class ChassisControlObject(Openbmc.DbusProperties,Openbmc.DbusObjectManager):
 		in_signature='', out_signature='')
 	def powerOff(self):
 		print "Turn off power"
+		intfwatchdog = self.getInterface('watchdog')
+		intfwatchdog.stop()
 		intf = self.getInterface('power_control')
 		intf.setPowerState(POWER_OFF)
 		return None
@@ -185,8 +203,8 @@ class ChassisControlObject(Openbmc.DbusProperties,Openbmc.DbusObjectManager):
 		
 	def host_watchdog_signal_handler(self):
 		print "Watchdog Error, Hard Rebooting"
-		#self.Set(DBUS_NAME,"reboot",1)
-		#self.powerOff()
+		self.Set(DBUS_NAME,"reboot",1)
+		self.powerOff()
 
 	def emergency_shutdown_signal_handler(self):
 		print "Emergency Shutdown!"

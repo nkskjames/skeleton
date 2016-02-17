@@ -1,10 +1,15 @@
 import dbus
+import os
+import cPickle
+import json
 
 BUS_PREFIX = 'org.openbmc'
 OBJ_PREFIX = "/org/openbmc"
 GPIO_DEV = '/sys/class/gpio'
 BUS = "system"
+CACHE_PATH = '/var/lib/obmc/inventory/'
 
+## Utility functions
 def getSystemName():
 	#use filename as system name, strip off path and ext
 	parts = __file__.replace('.pyc','').replace('.py','').split('/')
@@ -18,6 +23,7 @@ def getDBus():
 		bus = dbus.SystemBus()
 	return bus
 
+## Classes designed for being subclassed by Dbus object classes
 class DbusProperties(dbus.service.Object):
 	def __init__(self):
 		dbus.service.Object.__init__(self)
@@ -86,6 +92,75 @@ class DbusProperties(dbus.service.Object):
 	def PropertiesChanged(self, interface_name, changed_properties,
 		invalidated_properties):
 		pass
+
+class DbusPropertiesCached(DbusProperties):
+	def __init__(self, object_path, cached_interfaces):
+		DbusProperties.__init__(self)
+		self.object_path = object_path
+		self.cached_interfaces = cached_interfaces
+		for intf in self.cached_interfaces.keys():
+			self.load(intf, self.properties)
+
+	def Set(self, interface_name, property_name, new_value):
+		super(DbusPropertiesCached,self).Set(interface_name,property_name,new_value)
+		if (self.cached_interfaces.has_key(interface_name)):
+			self.save(interface_name,self.properties)
+
+	def SetMultiple(self, interface_name, prop_dict):
+		super(DbusPropertiesCached,self).SetMultiple(interface_name,prop_dict)
+		if (self.cached_interfaces.has_key(interface_name)):
+			self.save(interface_name,self.properties)
+
+	def getCacheFilename(self,obj_path, iface_name):
+		name = obj_path.replace('/','.')
+		filename = CACHE_PATH+name[1:]+"@"+iface_name+".props"
+		return filename
+
+	def save(self,iface_name, properties):
+		obj_path = self.object_path
+		print "Caching: "+obj_path
+		try:
+			filename = self.getCacheFilename(obj_path, iface_name)
+			output = open(filename, 'wb')
+			try:
+				## use json module to convert dbus datatypes
+				props = json.dumps(properties[iface_name])
+				prop_obj = json.loads(props)
+				cPickle.dump(prop_obj,output)
+			except Exception as e:
+				print "ERROR: "+str(e)
+			finally:
+				output.close()
+		except:
+			print "ERROR opening cache file: "+filename
+
+
+	def load(self, iface_name, properties):
+		obj_path = self.object_path
+		## overlay with pickled data
+		filename=self.getCacheFilename(obj_path, iface_name)
+
+		if (properties.has_key(iface_name) == False):
+			properties[iface_name] = {}
+
+		if (os.path.isfile(filename)):
+			print "Loading from cache: "+filename
+			try:
+				p = open(filename, 'rb')
+				data = cPickle.load(p)
+				for prop in data.keys():
+					## TODO: Dbus does not like empty lists since
+					## it does not know signature.
+					## If list is empty, change to empty string.
+					if (isinstance(data[prop],list)):
+						if (not data[prop]):
+							data[prop] = ""
+					properties[iface_name][prop] = data[prop]
+			except Exception as e:
+				print "ERROR: Loading cache file: " +str(e)
+			finally:
+				p.close()
+
 
 class DbusObjectManager(dbus.service.Object):
 	def __init__(self):
